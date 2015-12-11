@@ -92,9 +92,9 @@ impl Window {
         }
 
         match unsafe { winmm::timeBeginPeriod(1) } {
-            TIMERR_NOERROR => println!("time period set to 1ms"),
+            TIMERR_NOERROR => {},
             TIMERR_NOCANDO => println!("unable to set timer period"),
-            _ => panic!("invalid result form winmm::timeBeginPeriod()"),
+            _ => panic!("invalid result from winmm::timeBeginPeriod()"),
         }
 
         window
@@ -123,7 +123,10 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
-        unsafe { winmm::timeEndPeriod(1) };
+        unsafe {
+            winmm::timeEndPeriod(1);
+            user32::DestroyWindow(self.handle);
+        }
     }
 }
 
@@ -171,7 +174,9 @@ fn convert_windows_scancode(wParam: WPARAM, _: LPARAM) -> ScanCode {
     match key_code {
         A ... Z
       | CHAR_0 ... CHAR_9
-      | 32 => {
+      | 32
+      | 192
+      | 120 ... 122 => {
           unsafe { mem::transmute(key_code) }
         },
         _ => {

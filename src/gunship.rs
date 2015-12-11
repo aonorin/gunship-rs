@@ -1,10 +1,20 @@
-#![feature(core_intrinsics, raw, drain)]
+#![feature(core, core_intrinsics, raw, drain, unboxed_closures, hashmap_hasher, augmented_assignments)]
 
 extern crate bootstrap_rs as bootstrap;
 extern crate bootstrap_audio as bs_audio;
-extern crate parse_collada as collada;
 extern crate polygon;
 extern crate polygon_math as math;
+extern crate hash;
+
+pub mod stopwatch {
+    extern crate stopwatch;
+
+    #[cfg(feature="timing")]
+    pub use self::stopwatch::{Collector, Stopwatch};
+
+    #[cfg(not(feature="timing"))]
+    pub use self::stopwatch::null::{Collector, Stopwatch};
+}
 
 pub mod engine;
 pub mod scene;
@@ -28,6 +38,8 @@ pub use self::component::mesh::{MeshManager, Mesh};
 pub use self::component::light::{LightManager, Light, PointLight};
 pub use self::component::audio::{AudioSourceManager, AudioSource};
 pub use self::component::alarm::{AlarmID, AlarmManager};
+pub use self::component::collider::{ColliderManager, Collider};
+pub use self::component::singleton_component_manager::SingletonComponentManager;
 pub use self::component::struct_component_manager::StructComponentManager;
 
 // TODO: These are only needed for hotloading support.

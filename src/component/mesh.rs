@@ -7,6 +7,7 @@ use polygon::gl_render::{GLMeshData, ShaderProgram};
 
 use ecs::{Entity, ComponentManager};
 use resource::ResourceManager;
+use super::{EntityMap, EntitySet};
 
 #[derive(Debug, Clone)]
 pub struct Mesh {
@@ -18,9 +19,9 @@ pub struct MeshManager {
     resource_manager: Rc<ResourceManager>,
     meshes: Vec<Mesh>,
     entities: Vec<Entity>,
-    indices: HashMap<Entity, usize>,
+    indices: EntityMap<usize>,
 
-    marked_for_destroy: RefCell<HashSet<Entity>>,
+    marked_for_destroy: RefCell<EntitySet>,
 }
 
 impl MeshManager {
@@ -29,9 +30,9 @@ impl MeshManager {
             resource_manager: resource_manager,
             meshes: Vec::new(),
             entities: Vec::new(),
-            indices: HashMap::new(),
+            indices: HashMap::default(),
 
-            marked_for_destroy: RefCell::new(HashSet::new()),
+            marked_for_destroy: RefCell::new(HashSet::default()),
         }
     }
 
@@ -47,7 +48,11 @@ impl MeshManager {
     }
 
     pub fn assign(&mut self, entity: Entity, path_text: &str) -> &Mesh {
-        let mesh = self.resource_manager.get_mesh(path_text).unwrap();
+        let mesh =
+            self.resource_manager
+            .get_gpu_mesh(path_text)
+            .ok_or_else(|| format!("ERROR: Unable to assign mesh with uri {}", path_text))
+            .unwrap(); // OK to panic here, indicates a bug in gameplay code.
         self.give_mesh(entity, mesh)
     }
 
@@ -98,7 +103,7 @@ impl ComponentManager for MeshManager {
     }
 
     fn destroy_marked(&mut self) {
-        let mut marked_for_destroy = RefCell::new(HashSet::new());
+        let mut marked_for_destroy = RefCell::new(HashSet::default());
         ::std::mem::swap(&mut marked_for_destroy, &mut self.marked_for_destroy);
         let mut marked_for_destroy = marked_for_destroy.into_inner();
         for entity in marked_for_destroy.drain() {

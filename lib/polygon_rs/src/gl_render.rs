@@ -30,8 +30,9 @@ impl GLRender {
     pub fn new(window: &Window) -> GLRender {
         let gl = gl::Context::new(window);
 
-        let version_str = gl.get_string(StringName::Version);
-        println!("OpenGL Version: {:?}", version_str);
+        // TODO: Once better logging is implemented leave logging in and just disable unwanted logs.
+        // let version_str = gl.get_string(StringName::Version);
+        // println!("OpenGL Version: {:?}", version_str);
 
         gl.enable(ServerCapability::DebugOutput);
 
@@ -68,7 +69,7 @@ impl GLRender {
 
         gl.buffer_data(
             BufferTarget::ArrayBuffer,
-            &*mesh.raw_data,
+            mesh.vertex_data(),
             BufferUsage::StaticDraw);
 
         let index_buffer = gl.gen_buffer();
@@ -76,7 +77,7 @@ impl GLRender {
 
         gl.buffer_data(
             BufferTarget::ElementArrayBuffer,
-            &*mesh.indices,
+            mesh.indices(),
             BufferUsage::StaticDraw);
 
         // Unbind buffers.
@@ -88,10 +89,18 @@ impl GLRender {
             vertex_array: vertex_array,
             vertex_buffer: vertex_buffer,
             index_buffer: index_buffer,
-            position_attribute: mesh.position_attribute,
-            normal_attribute: mesh.normal_attribute,
-            element_count: mesh.indices.len(),
+            position_attribute: mesh.position(),
+            normal_attribute: mesh.normal(),
+            element_count: mesh.indices().len(),
         }
+    }
+
+    /// SUPER BAD LACK OF SAFETY, should be using RAII and some proper resource management, but
+    /// that will have to wait until we get a real rendering system.
+    pub fn delete_mesh(&self, mesh: GLMeshData) {
+        self.gl.delete_buffer(mesh.vertex_buffer);
+        self.gl.delete_buffer(mesh.index_buffer);
+        self.gl.delete_vertex_array(mesh.vertex_array);
     }
 
     pub fn draw_mesh(
@@ -206,7 +215,7 @@ impl GLRender {
                 let light_position = match light {
                     Light::Point(ref point_light) => point_light.position
                 };
-                let light_position_view = view_transform * light_position;
+                let light_position_view = light_position * view_transform;
 
                 gl.uniform_4f(light_position_location, light_position_view.as_array());
 
@@ -234,7 +243,7 @@ impl GLRender {
                     let light_position = match light {
                         Light::Point(ref point_light) => point_light.position
                     };
-                    let light_position_view = view_transform * light_position;
+                    let light_position_view = light_position * view_transform;
 
                     gl.uniform_4f(light_position_location, light_position_view.as_array());
 
@@ -303,13 +312,16 @@ impl GLRender {
         camera: &Camera,
         shader: &ShaderProgram,
         mesh: &GLMeshData,
-        model_transform: Matrix4
+        model_transform: Matrix4,
+        color: Color,
     ) {
         let gl = &self.gl;
         let view_transform = camera.view_matrix();
         let model_view_transform = view_transform * model_transform;
         let projection_transform = camera.projection_matrix();
         let model_view_projection = projection_transform * model_view_transform;
+
+        shader.set_active(gl);
 
         // Bind the buffers for the mesh.
         gl.bind_vertex_array(mesh.vertex_array);
@@ -362,6 +374,10 @@ impl GLRender {
                 model_view_projection_location,
                 true,
                 model_view_projection.raw_data());
+        }
+
+        if let Some(surface_color_location) = shader.surface_color {
+            gl.uniform_4f(surface_color_location, color.as_array());
         }
 
         gl.draw_elements(
